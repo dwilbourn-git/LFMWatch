@@ -16,7 +16,7 @@ local C = Style.COLORS
 
 local MAX_ROWS = 8
 local ROW_HEIGHT = 22
-local TITLE_HEIGHT = 28
+local TITLE_HEIGHT = 30
 local WIDTH = 380
 local PAD = 10
 local NAME_WIDTH = 96
@@ -139,13 +139,13 @@ local function CreateRow(index)
     row.flash:SetColorTexture(C.highlight[1], C.highlight[2], C.highlight[3], 1)
     row.flash:SetAlpha(0)
 
-    row.name = Style.Text(row, 13, true, C.text)
+    row.name = Style.DataText(row, 14, C.text)
     row.name:SetPoint("LEFT", row, "LEFT", 2, 1)
     row.name:SetWidth(NAME_WIDTH)
     row.name:SetJustifyH("LEFT")
     if row.name.SetWordWrap then row.name:SetWordWrap(false) end
 
-    row.instance = Style.Text(row, 12, false, C.text)
+    row.instance = Style.DataText(row, 13, C.text)
     row.instance:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
     row.instance:SetPoint("RIGHT", row, "RIGHT", -(SEAT_COLUMN + 6), 1)
     row.instance:SetJustifyH("LEFT")
@@ -157,7 +157,7 @@ local function CreateRow(index)
         icon:SetPoint("LEFT", row, "RIGHT", -SEAT_COLUMN + (i - 1) * SEAT_STEP, 1)
         row.seats[i] = icon
     end
-    row.more = Style.Text(row, 12, true, C.dim)
+    row.more = Style.DataText(row, 13, C.dim)
     row.more:SetPoint("LEFT", row, "RIGHT", -SEAT_COLUMN + MAX_SEATS * SEAT_STEP, 1)
     row.more:SetText("+")
 
@@ -223,23 +223,23 @@ local function EnsureFrame()
     end)
     Style.Panel(frame)
 
-    local title = Style.Heading(frame, "LFM Watch")
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -8)
+    local title = Style.Heading(frame, "LFM Watch", 13)
+    title:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -9)
     titleCount = Style.Text(frame, 12, false, C.dim)
     titleCount:SetPoint("LEFT", title, "RIGHT", 6, 0)
 
-    local close = CreateFrame("Button", nil, frame)
-    close:SetSize(18, 18)
-    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -5)
-    local x = Style.Text(close, 14, true, C.border)
-    x:SetAllPoints()
-    x:SetText("x")
-    close:SetScript("OnEnter", function() x:SetTextColor(C.highlight[1], C.highlight[2], C.highlight[3]) end)
-    close:SetScript("OnLeave", function() x:SetTextColor(C.border[1], C.border[2], C.border[3]) end)
-    close:SetScript("OnClick", function()
+    local rule = frame:CreateTexture(nil, "ARTWORK")
+    rule:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -(TITLE_HEIGHT - 3))
+    rule:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -(TITLE_HEIGHT - 3))
+    rule:SetHeight(1)
+    rule:SetColorTexture(C.border[1], C.border[2], C.border[3], 0.6)
+
+    local close = Style.CloseButton(frame, function()
         closedByHand = true
         frame:Hide()
     end)
+    close:SetScale(0.75)
+    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
 
     emptyText = Style.Text(frame, 12, false, C.dim)
     emptyText:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + 2, -TITLE_HEIGHT - 4)

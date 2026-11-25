@@ -8,8 +8,8 @@ Media/Border.tga, Media/Circle.tga
     From FlareUI by Malkkav (Borders/FlareUI-Thin.tga, Panel/Circle.tga),
     MIT License ..................................... FlareUI-MIT.txt
 
-Media/RobotoCondensed-Regular.ttf, Media/RobotoCondensed-Bold.ttf
+Media/RobotoCondensed-Regular.ttf
     Roboto Condensed, Google Inc., Apache License 2.0
     ............................................. RobotoCondensed-Apache-2.0.txt
 
-The window colours follow FlareUI's palette.
+The windows follow the way FlareUI draws its settings panel.

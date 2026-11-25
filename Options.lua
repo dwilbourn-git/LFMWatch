@@ -5,28 +5,51 @@ local ADDON, ns = ...
 local Options = {}
 ns.Options = Options
 
-local WIDTH, HEIGHT = 560, 600
-local CONTENT_WIDTH = 500
-local ROW = 24
+local WIDTH, HEIGHT = 600, 640
+local CONTENT_WIDTH = 520
+local ROW = 28
+local INDENT = 14          -- from the edge of a section box to its contents
 local NAME_WIDTH = 210
 local ALIAS_WIDTH = 220
 
 local Style = ns.Style
 local C = Style.COLORS
 
-local frame, scroll, content
+local frame, scroll, content, textLayer
 local Build   -- defined below
 
 --------------------------------------------------------------------------
 -- Widget pools: the window is rebuilt from scratch each time it changes
 --------------------------------------------------------------------------
-local pools = { check = {}, label = {}, edit = {}, button = {} }
-local used = { check = 0, label = 0, edit = 0, button = 0 }
+local pools = { check = {}, label = {}, edit = {}, button = {}, box = {} }
+local used = { check = 0, label = 0, edit = 0, button = 0, box = 0 }
 
 local creators = {}
 
+-- Section boxes sit just above the content; controls and text go above them.
+local function Raise(widget)
+    widget:SetFrameLevel(content:GetFrameLevel() + 3)
+    return widget
+end
+
+-- A section: a dark box with a yellow title and a line under it.
+function creators.box()
+    local ok, box = pcall(CreateFrame, "Frame", nil, content, "BackdropTemplate")
+    if not (ok and box) then box = CreateFrame("Frame", nil, content) end
+    box:SetFrameLevel(content:GetFrameLevel() + 1)
+    Style.Box(box)
+    box.title = Style.Heading(box, "", 16)
+    box.title:SetPoint("TOPLEFT", INDENT, -12)
+    local line = box:CreateTexture(nil, "ARTWORK")
+    line:SetPoint("TOPLEFT", 10, -36)
+    line:SetPoint("TOPRIGHT", -10, -36)
+    line:SetHeight(1)
+    line:SetColorTexture(C.border[1], C.border[2], C.border[3], 0.6)
+    return box
+end
+
 function creators.check()
-    local cb = Style.Check(content)
+    local cb = Raise(Style.Check(content))
     if cb.label.SetWordWrap then cb.label:SetWordWrap(false) end
     cb:SetScript("OnClick", function(self)
         if self.onChange then self.onChange(self:GetChecked() and true or false) end
@@ -35,11 +58,11 @@ function creators.check()
 end
 
 function creators.label()
-    return Style.Text(content, 12, false, C.text)
+    return Style.Text(textLayer, 13, false, C.text)
 end
 
 function creators.edit()
-    local eb = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
+    local eb = Raise(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
     eb:SetAutoFocus(false)
     eb:SetHeight(20)
     eb:SetMaxLetters(600)
@@ -64,7 +87,7 @@ function creators.edit()
 end
 
 function creators.button()
-    local b = Style.Button(content, "", 80, 20)
+    local b = Raise(Style.Button(content, "", 80, 22))
     b:SetScript("OnClick", function(self)
         if self.onClick then self.onClick(self) end
     end)
@@ -100,36 +123,46 @@ end
 -- Layout helpers; y is the running offset from the top of the content
 --------------------------------------------------------------------------
 local y
+local openBox, openBoxTop
+
+-- Ends the section in progress: its box reaches down to here.
+local function CloseBox()
+    if openBox then
+        openBox:SetHeight(y - openBoxTop + 10)
+        y = y + 10
+        openBox = nil
+    end
+end
 
 local function Header(text)
-    y = y + 8
+    CloseBox()
+    y = y + 10
+    local box = Acquire("box")
+    box:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+    box:SetWidth(CONTENT_WIDTH)
+    box:SetHeight(60)
+    box.title:SetText(text)
+    openBox, openBoxTop = box, y
+    y = y + 46
+end
+
+local function Note(text)
     local fs = Acquire("label")
-    Style.SetFont(fs, 13, true)
-    fs:SetTextColor(C.title[1], C.title[2], C.title[3])
-    fs:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -y)
-    fs:SetWidth(CONTENT_WIDTH)
+    Style.SetFont(fs, 12)
+    fs:SetTextColor(0.75, 0.75, 0.75)
+    fs:SetPoint("TOPLEFT", content, "TOPLEFT", INDENT + 2, -y)
+    fs:SetWidth(CONTENT_WIDTH - 2 * INDENT)
     fs:SetJustifyH("LEFT")
     fs:SetText(text)
     y = y + 20
 end
 
-local function Note(text)
-    local fs = Acquire("label")
-    Style.SetFont(fs, 11, false)
-    fs:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
-    fs:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -y)
-    fs:SetWidth(CONTENT_WIDTH)
-    fs:SetJustifyH("LEFT")
-    fs:SetText(text)
-    y = y + 16
-end
-
 local function Check(x, text, checked, onChange, greyed, labelWidth)
     local cb = Acquire("check")
-    cb:SetPoint("TOPLEFT", content, "TOPLEFT", x + 2, -y - 4)
+    cb:SetPoint("TOPLEFT", content, "TOPLEFT", x + INDENT - 6, -y)
     cb:Enable()
     cb:SetChecked(checked and true or false)
-    cb:SetLabel(text, labelWidth or (CONTENT_WIDTH - 40))
+    cb:SetLabel(text, labelWidth or (CONTENT_WIDTH - 2 * INDENT - 30))
     local colour = greyed and C.dim or C.text
     cb.label:SetTextColor(colour[1], colour[2], colour[3])
     cb.onChange = onChange
@@ -138,7 +171,7 @@ end
 
 local function Edit(x, width, text, onSave)
     local eb = Acquire("edit")
-    eb:SetPoint("TOPLEFT", content, "TOPLEFT", x + 6, -y - 1)
+    eb:SetPoint("TOPLEFT", content, "TOPLEFT", x + INDENT + 6, -y - 2)
     eb:SetWidth(width)
     eb.saved = text or ""
     eb:SetText(eb.saved)
@@ -149,7 +182,7 @@ end
 
 local function Button(x, width, text, onClick)
     local b = Acquire("button")
-    b:SetPoint("TOPLEFT", content, "TOPLEFT", x, -y)
+    b:SetPoint("TOPLEFT", content, "TOPLEFT", x + INDENT, -y - 1)
     b:SetWidth(width)
     b:SetText(text)
     b.onClick = onClick
@@ -267,14 +300,14 @@ local function AddSection()
         Build()
     end
     Button(4, 110, "Add dungeon", function() Add("dungeon") end)
-    Button(120, 110, "Add raid", function() Add("raid") end)
+    Button(134, 110, "Add raid", function() Add("raid") end)
     y = y + ROW + 2
 end
 
 local function WordsSection()
     Header("Words")
     Note("A message must name a ticked dungeon or raid and contain one of these:")
-    Edit(0, CONTENT_WIDTH - 20, table.concat(ns.db.triggers, ", "), function(text, box)
+    Edit(0, CONTENT_WIDTH - 2 * INDENT - 12, table.concat(ns.db.triggers, ", "), function(text, box)
         ns.db.triggers = ns.Journal.ParseList(text)
         box.saved = table.concat(ns.db.triggers, ", ")
         box:SetText(box.saved)
@@ -282,7 +315,7 @@ local function WordsSection()
     end)
     y = y + ROW + 2
     Note("A message containing any of these is never marked:")
-    Edit(0, CONTENT_WIDTH - 20, table.concat(ns.db.ignore, ", "), function(text, box)
+    Edit(0, CONTENT_WIDTH - 2 * INDENT - 12, table.concat(ns.db.ignore, ", "), function(text, box)
         ns.db.ignore = ns.Journal.ParseList(text)
         box.saved = table.concat(ns.db.ignore, ", ")
         box:SetText(box.saved)
@@ -301,13 +334,13 @@ local function WordsSection()
     y = y + ROW + 2
 
     local fs = Acquire("label")
-    Style.SetFont(fs, 12, false)
+    Style.SetFont(fs, 13)
     fs:SetTextColor(C.text[1], C.text[2], C.text[3])
-    fs:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -y - 4)
-    fs:SetWidth(260)
+    fs:SetPoint("TOPLEFT", content, "TOPLEFT", INDENT + 2, -y - 6)
+    fs:SetWidth(300)
     fs:SetJustifyH("LEFT")
     fs:SetText("Minutes a person stays on the list (1-15):")
-    Edit(270, 40, tostring(ns.db.expiryMinutes), function(text, box)
+    Edit(310, 40, tostring(ns.db.expiryMinutes), function(text, box)
         ns.db.expiryMinutes = ns.ClampExpiry(text)
         box.saved = tostring(ns.db.expiryMinutes)
         box:SetText(box.saved)
@@ -318,12 +351,13 @@ end
 Build = function()
     if not frame then return end
     ReleaseAll()
-    y = 0
+    y, openBox = 0, nil
     ChannelSection()
     InstanceSection("Dungeons", "dungeon")
     InstanceSection("Raids", "raid")
     AddSection()
     WordsSection()
+    CloseBox()
     content:SetHeight(y + 10)
 end
 
@@ -332,8 +366,7 @@ end
 --------------------------------------------------------------------------
 local function EnsureFrame()
     if frame then return end
-    local ok, made = pcall(CreateFrame, "Frame", "LFMWatchOptionsFrame", UIParent, "BackdropTemplate")
-    frame = (ok and made) or CreateFrame("Frame", "LFMWatchOptionsFrame", UIParent)
+    frame = CreateFrame("Frame", "LFMWatchOptionsFrame", UIParent)
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
@@ -343,33 +376,31 @@ local function EnsureFrame()
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    Style.Panel(frame)
+    Style.Window(frame)
 
-    local title = Style.Heading(frame, "LFM Watch")
-    Style.SetFont(title, 16, true)
-    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -12)
+    local title = Style.Heading(frame, "LFM Watch", 22)
+    title:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -20)
 
-    local hint = Style.Text(frame, 11, false, C.dim)
-    hint:SetPoint("LEFT", title, "RIGHT", 10, -1)
+    local hint = Style.Text(frame, 12, false, C.dim)
+    hint:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 12, 2)
     hint:SetText("Try a message with /lfw test LF1M healer DM")
 
-    local close = CreateFrame("Button", nil, frame)
-    close:SetSize(20, 20)
-    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
-    local x = Style.Text(close, 15, true, C.border)
-    x:SetAllPoints()
-    x:SetText("x")
-    close:SetScript("OnEnter", function() x:SetTextColor(C.highlight[1], C.highlight[2], C.highlight[3]) end)
-    close:SetScript("OnLeave", function() x:SetTextColor(C.border[1], C.border[2], C.border[3]) end)
-    close:SetScript("OnClick", function() frame:Hide() end)
+    local close = Style.CloseButton(frame, function() frame:Hide() end)
+    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+    close:SetFrameLevel(frame:GetFrameLevel() + 40)
 
     scroll = CreateFrame("ScrollFrame", "LFMWatchOptionsScroll", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -40)
-    scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 12)
+    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, -56)
+    scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 22)
 
     content = CreateFrame("Frame", nil, scroll)
     content:SetSize(CONTENT_WIDTH, 10)
     scroll:SetScrollChild(content)
+
+    -- text is drawn on its own layer, above the section boxes
+    textLayer = CreateFrame("Frame", nil, content)
+    textLayer:SetAllPoints()
+    textLayer:SetFrameLevel(content:GetFrameLevel() + 2)
 
     -- closes with Escape
     if type(UISpecialFrames) == "table" then
