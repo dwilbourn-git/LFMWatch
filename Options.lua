@@ -11,6 +11,9 @@ local ROW = 24
 local NAME_WIDTH = 210
 local ALIAS_WIDTH = 220
 
+local Style = ns.Style
+local C = Style.COLORS
+
 local frame, scroll, content
 local Build   -- defined below
 
@@ -23,11 +26,7 @@ local used = { check = 0, label = 0, edit = 0, button = 0 }
 local creators = {}
 
 function creators.check()
-    local cb = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
-    cb:SetSize(22, 22)
-    cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    cb.label:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-    cb.label:SetJustifyH("LEFT")
+    local cb = Style.Check(content)
     if cb.label.SetWordWrap then cb.label:SetWordWrap(false) end
     cb:SetScript("OnClick", function(self)
         if self.onChange then self.onChange(self:GetChecked() and true or false) end
@@ -36,7 +35,7 @@ function creators.check()
 end
 
 function creators.label()
-    return content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    return Style.Text(content, 12, false, C.text)
 end
 
 function creators.edit()
@@ -44,6 +43,7 @@ function creators.edit()
     eb:SetAutoFocus(false)
     eb:SetHeight(20)
     eb:SetMaxLetters(600)
+    Style.EditBackdrop(eb)
     local function Save(self)
         local text = self:GetText() or ""
         if text ~= self.saved then
@@ -64,8 +64,7 @@ function creators.edit()
 end
 
 function creators.button()
-    local b = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    b:SetHeight(22)
+    local b = Style.Button(content, "", 80, 20)
     b:SetScript("OnClick", function(self)
         if self.onClick then self.onClick(self) end
     end)
@@ -105,7 +104,8 @@ local y
 local function Header(text)
     y = y + 8
     local fs = Acquire("label")
-    fs:SetFontObject("GameFontNormal")
+    Style.SetFont(fs, 13, true)
+    fs:SetTextColor(C.title[1], C.title[2], C.title[3])
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -y)
     fs:SetWidth(CONTENT_WIDTH)
     fs:SetJustifyH("LEFT")
@@ -115,7 +115,8 @@ end
 
 local function Note(text)
     local fs = Acquire("label")
-    fs:SetFontObject("GameFontDisableSmall")
+    Style.SetFont(fs, 11, false)
+    fs:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -y)
     fs:SetWidth(CONTENT_WIDTH)
     fs:SetJustifyH("LEFT")
@@ -125,12 +126,13 @@ end
 
 local function Check(x, text, checked, onChange, greyed)
     local cb = Acquire("check")
-    cb:SetPoint("TOPLEFT", content, "TOPLEFT", x, -y)
+    cb:SetPoint("TOPLEFT", content, "TOPLEFT", x + 2, -y - 4)
     cb:Enable()
     cb:SetChecked(checked and true or false)
     cb.label:SetWidth(CONTENT_WIDTH - 40)
     cb.label:SetText(text)
-    if greyed then cb.label:SetTextColor(0.5, 0.5, 0.5) else cb.label:SetTextColor(1, 1, 1) end
+    local colour = greyed and C.dim or C.text
+    cb.label:SetTextColor(colour[1], colour[2], colour[3])
     cb.onChange = onChange
     return cb
 end
@@ -301,7 +303,8 @@ local function WordsSection()
     y = y + ROW + 2
 
     local fs = Acquire("label")
-    fs:SetFontObject("GameFontHighlight")
+    Style.SetFont(fs, 12, false)
+    fs:SetTextColor(C.text[1], C.text[2], C.text[3])
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -y - 4)
     fs:SetWidth(260)
     fs:SetJustifyH("LEFT")
@@ -331,7 +334,8 @@ end
 --------------------------------------------------------------------------
 local function EnsureFrame()
     if frame then return end
-    frame = CreateFrame("Frame", "LFMWatchOptionsFrame", UIParent)
+    local ok, made = pcall(CreateFrame, "Frame", "LFMWatchOptionsFrame", UIParent, "BackdropTemplate")
+    frame = (ok and made) or CreateFrame("Frame", "LFMWatchOptionsFrame", UIParent)
     frame:SetSize(WIDTH, HEIGHT)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
@@ -341,31 +345,24 @@ local function EnsureFrame()
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+    Style.Panel(frame)
 
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
-    local function Edge()
-        local t = frame:CreateTexture(nil, "BORDER")
-        t:SetColorTexture(1, 0.82, 0, 0.9)
-        return t
-    end
-    local top, bottom, left, right = Edge(), Edge(), Edge(), Edge()
-    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(1)
-    bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT"); bottom:SetHeight(1)
-    left:SetPoint("TOPLEFT"); left:SetPoint("BOTTOMLEFT"); left:SetWidth(1)
-    right:SetPoint("TOPRIGHT"); right:SetPoint("BOTTOMRIGHT"); right:SetWidth(1)
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = Style.Heading(frame, "LFM Watch")
+    Style.SetFont(title, 16, true)
     title:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -12)
-    title:SetText("LFMWatch")
 
-    local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    local hint = Style.Text(frame, 11, false, C.dim)
     hint:SetPoint("LEFT", title, "RIGHT", 10, -1)
     hint:SetText("Try a message with /lfw test LF1M healer DM")
 
-    local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+    local close = CreateFrame("Button", nil, frame)
+    close:SetSize(20, 20)
+    close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
+    local x = Style.Text(close, 15, true, C.border)
+    x:SetAllPoints()
+    x:SetText("x")
+    close:SetScript("OnEnter", function() x:SetTextColor(C.highlight[1], C.highlight[2], C.highlight[3]) end)
+    close:SetScript("OnLeave", function() x:SetTextColor(C.border[1], C.border[2], C.border[3]) end)
     close:SetScript("OnClick", function() frame:Hide() end)
 
     scroll = CreateFrame("ScrollFrame", "LFMWatchOptionsScroll", frame, "UIPanelScrollFrameTemplate")
