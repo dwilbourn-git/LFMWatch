@@ -57,6 +57,7 @@ local instances = {}   -- { { name = "Deadmines", needles = { " deadmines ", " d
 local triggers = {}    -- { " lfm ", ... }
 local ignores = {}     -- { { word = "wts", needle = " wts " }, ... }
 local roles = {}       -- { { role = "tank", needle = " tank " }, ... }
+local others = {}      -- needles of known instances that are not watched
 
 local function AddNeedle(list, seen, word)
     local needle = Needle(word)
@@ -67,10 +68,11 @@ local function AddNeedle(list, seen, word)
 end
 
 function Match.Rebuild()
-    instances, triggers, ignores, roles = {}, {}, {}, {}
+    instances, triggers, ignores, roles, others = {}, {}, {}, {}, {}
     local db, cdb = ns.db, ns.cdb
     if not (db and cdb) then return end
 
+    local watchedNeedles = {}
     for key, on in pairs(cdb.watched) do
         local inst = on and db.instances[key]
         if type(inst) == "table" and type(inst.name) == "string" then
@@ -83,9 +85,11 @@ function Match.Rebuild()
                 AddNeedle(needles, seen, alias)
             end
             if #needles > 0 then
+                for _, needle in ipairs(needles) do watchedNeedles[needle] = true end
                 instances[#instances + 1] = {
                     name = inst.name,
                     needles = needles,
+                    raid = inst.kind == "raid",
                     -- wings share the part before ": " ("Scarlet Monastery: Library")
                     group = inst.name:match("^(.-):%s") or inst.name,
                 }
@@ -93,6 +97,28 @@ function Match.Rebuild()
         end
     end
     table.sort(instances, function(a, b) return a.name < b.name end)
+
+    -- Known instances that are not watched, for Match.Followup: full names,
+    -- and aliases of four or more letters. Short aliases ("st", "lib") are
+    -- too easily ordinary words. Anything a watched instance also answers to
+    -- is left out.
+    local otherSeen = {}
+    for key, inst in pairs(db.instances) do
+        if not cdb.watched[key] and type(inst) == "table" and type(inst.name) == "string" then
+            local candidates = { inst.name }
+            local short = inst.name:lower():match("^the%s+(.+)$")
+            if short then candidates[#candidates + 1] = short end
+            for _, alias in ipairs(inst.aliases or {}) do
+                if type(alias) == "string" and #alias:gsub("%s", "") >= 4 then
+                    candidates[#candidates + 1] = alias
+                end
+            end
+            for _, word in ipairs(candidates) do
+                local needle = Needle(word)
+                if needle and not watchedNeedles[needle] then AddNeedle(others, otherSeen, word) end
+            end
+        end
+    end
 
     local seen = {}
     for _, word in ipairs(db.triggers or {}) do AddNeedle(triggers, seen, word) end
@@ -123,6 +149,7 @@ end
 -- text: the raw message. Returns
 -- { matched = boolean, reason = string, instances = { name, ... }, roles = { role, ... } }
 -- reason is "ok", "no watched instance", "no trigger" or "ignore word: <word>".
+-- A match also carries kind ("dungeon" or "raid") and seats (see Seats.lua).
 function Match.Check(text)
     if not built then Match.Rebuild() end
     local norm = Match.Normalize(text)
@@ -146,7 +173,7 @@ function Match.Check(text)
         if best > 0 then
             local g = groups[inst.group]
             if not g then
-                g = { best = 0, names = {} }
+                g = { best = 0, names = {}, raid = inst.raid }
                 groups[inst.group] = g
                 groupOrder[#groupOrder + 1] = inst.group
             end
@@ -157,10 +184,11 @@ function Match.Check(text)
             end
         end
     end
-    local names = {}
+    local names, kind = {}, "dungeon"
     for _, group in ipairs(groupOrder) do
         local g = groups[group]
         names[#names + 1] = (#g.names > 1) and group or g.names[1]
+        if g.raid then kind = "raid" end
     end
     table.sort(names)
     for i = #names, MAX_INSTANCES + 1, -1 do names[i] = nil end
@@ -183,7 +211,47 @@ function Match.Check(text)
         if found[role] then roleList[#roleList + 1] = role end
     end
 
-    return Result(true, "ok", names, roleList)
+    local result = Result(true, "ok", names, roleList)
+    result.kind = kind
+    result.seats = ns.Seats.Parse(norm, kind)
+    return result
+end
+
+-- A line from someone who already has a row and that Check did not match.
+-- kind: the row's kind. Returns nil (nothing to do) or
+--   { action = "full" }            the group is full
+--   { action = "moved" }           now recruiting for an instance not watched
+--   { action = "seats", seats = }  same group, different places open
+function Match.Followup(text, kind)
+    if not built then Match.Rebuild() end
+    local norm = Match.Normalize(text)
+
+    for _, ig in ipairs(ignores) do
+        if norm:find(ig.needle, 1, true) then return nil end
+    end
+
+    local triggered = false
+    for _, needle in ipairs(triggers) do
+        if norm:find(needle, 1, true) then
+            triggered = true
+            break
+        end
+    end
+
+    if not triggered then
+        for word in pairs(ns.Data.FULL_WORDS) do
+            if norm:find(" " .. word .. " ", 1, true) then return { action = "full" } end
+        end
+        return nil
+    end
+
+    for _, needle in ipairs(others) do
+        if norm:find(needle, 1, true) then return { action = "moved" } end
+    end
+
+    local seats = ns.Seats.Parse(norm, kind)
+    if seats.info then return { action = "seats", seats = seats } end
+    return nil
 end
 
 ns.OnLogin(Match.Rebuild)

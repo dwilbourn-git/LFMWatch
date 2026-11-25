@@ -26,11 +26,52 @@ Data.IGNORE = { "wts", "wtb", "selling", "boost" }
 
 -- Role words found in a message, and the role shown for each.
 Data.ROLES = {
-    tank = "tank",
-    healer = "healer", heals = "healer", heal = "healer",
+    tank = "tank", tanks = "tank",
+    healer = "healer", healers = "healer", heals = "healer", heal = "healer", healz = "healer",
     dps = "dps", dd = "dps",
 }
 Data.ROLE_ORDER = { "tank", "healer", "dps" }
+
+-- Class words found in a message, and the class shown for each.
+Data.CLASSES = {
+    warrior = "WARRIOR", warriors = "WARRIOR",
+    paladin = "PALADIN", paladins = "PALADIN", pally = "PALADIN", pallys = "PALADIN", pala = "PALADIN",
+    hunter = "HUNTER", hunters = "HUNTER",
+    rogue = "ROGUE", rogues = "ROGUE",
+    priest = "PRIEST", priests = "PRIEST",
+    shaman = "SHAMAN", shamans = "SHAMAN", shammy = "SHAMAN", sham = "SHAMAN",
+    mage = "MAGE", mages = "MAGE",
+    warlock = "WARLOCK", warlocks = "WARLOCK", lock = "WARLOCK", locks = "WARLOCK",
+    druid = "DRUID", druids = "DRUID",
+}
+
+-- The roles each class can fill. A role word next to a class word is read as
+-- that class's role only when the class can do it ("druid healer"), so
+-- "tank, mage, healer" stays three separate seats.
+Data.CLASS_ROLES = {
+    WARRIOR = { tank = true, dps = true },
+    PALADIN = { tank = true, healer = true, dps = true },
+    HUNTER = { dps = true },
+    ROGUE = { dps = true },
+    PRIEST = { healer = true, dps = true },
+    SHAMAN = { tank = true, healer = true, dps = true },
+    MAGE = { dps = true },
+    WARLOCK = { dps = true },
+    DRUID = { tank = true, healer = true, dps = true },
+}
+
+-- Words next to a class word that give its role.
+Data.SPEC_HINTS = { resto = "healer", holy = "healer", prot = "tank" }
+
+-- Roles named after one of these are already in the group ("have tank").
+Data.HAVE_WORDS = { have = true, got = true, with = true }
+
+-- Words that put the line back into "asking for" after a HAVE word.
+Data.NEED_WORDS = { need = true, needs = true, lf = true, lfm = true, looking = true }
+
+-- From a listed recruiter, with no trigger word: the group is full.
+-- After a role word: that role is full ("dps full").
+Data.FULL_WORDS = { full = true, filled = true }
 
 -- Built-in dungeons and raids. This client has no Encounter Journal (probed
 -- 2026-11-25: zero tiers, Blizzard_EncounterJournal reports WRONG_GAME_TYPE),
