@@ -123,25 +123,74 @@ local function WatchedChannel(event, channelName)
     return nil
 end
 
+-- What identifies a request: the sender's GUID when there is one, else the
+-- name. Never the channel, so one person posting in several channels is one
+-- row.
+function Chat.SenderKey(author, guid)
+    if Readable(guid) and type(guid) == "string" and guid ~= "" then return guid end
+    return author
+end
+
+-- One line from someone else on a watched channel. Returns the rewritten
+-- text (or nil to leave the line alone), the match result and the outcome:
+--   "match"     a recruiting line for a watched instance
+--   "followup"  the sender's row had its seats updated
+--   "full"      the sender's row was marked Group Full
+--   "moved"     the sender's row was removed
+--   "none"      nothing to do
+local function Handle(msg, author, guid, channel, isTest)
+    local key = Chat.SenderKey(author, guid)
+    local result = ns.Match.Check(msg)
+    local outcome, tagNames, seats = "none", nil, nil
+
+    if result.matched then
+        outcome, tagNames, seats = "match", result.instances, result.seats
+        ns.List.Add({
+            key = key,
+            sender = author,
+            display = author:match("^([^-]+)%-") or author,
+            guid = (key ~= author) and guid or nil,
+            instances = result.instances,
+            kind = result.kind,
+            seats = result.seats,
+            text = msg,
+            channel = channel,
+            time = GetTime(),
+        })
+    else
+        local row = ns.List.Get(key)
+        local follow = row and ns.Match.Followup(msg, row.kind) or nil
+        if follow and follow.action == "seats" then
+            outcome, tagNames, seats = "followup", row.instances, follow.seats
+            ns.List.UpdateSeats(key, follow.seats, msg, channel)
+        elseif follow and follow.action == "full" then
+            outcome = "full"
+            ns.List.MarkFull(key)
+        elseif follow and follow.action == "moved" then
+            outcome = "moved"
+            ns.List.Remove(key)
+        end
+    end
+
+    ns.Log(channel .. ": " .. ((outcome == "none") and result.reason or outcome))
+    ns.Notify({
+        channel = channel,
+        author = author,
+        text = msg,
+        outcome = outcome,
+        reason = result.reason,
+        instances = tagNames and table.concat(tagNames, "/") or nil,
+        seats = seats and ns.Seats.Describe(seats) or nil,
+        test = isTest or false,
+    })
+    return tagNames and Rewrite(msg, tagNames) or nil, result, outcome, seats
+end
+
 local function Decide(event, msg, author, channelName, guid)
     local channel = WatchedChannel(event, channelName)
     if not channel then return nil end
     if IsPlayer(author, guid) then return nil end
-
-    local result = ns.Match.Check(msg)
-    ns.Log(channel .. ": " .. result.reason)
-    if not result.matched then return nil end
-
-    ns.List.Add({
-        sender = author,
-        display = author:match("^([^-]+)%-") or author,
-        instances = result.instances,
-        roles = result.roles,
-        text = msg,
-        channel = channel,
-        time = GetTime(),
-    })
-    return Rewrite(msg, result.instances)
+    return (Handle(msg, author, guid, channel, false))
 end
 
 local function Filter(_, event, msg, author, ...)
@@ -191,25 +240,25 @@ end
 --------------------------------------------------------------------------
 -- /lfw test and /lfw debug
 --------------------------------------------------------------------------
--- Run the matcher on text as if a guildmate had said it.
+-- Run a line exactly as if a guildmate called TestSender had said it. The
+-- sender is always the same, so two tests in a row act as a request and its
+-- update.
 function Chat.Test(text)
-    local result = ns.Match.Check(text)
-    if not result.matched then
+    local newMsg, result, outcome, seats = Handle(text, "TestSender", nil, "test", true)
+    if outcome == "match" then
+        ns.Print("match: " .. table.concat(result.instances, "/") .. ". Seats: " .. ns.Seats.Describe(seats))
+    elseif outcome == "followup" then
+        ns.Print("follow-up: row updated. Seats: " .. ns.Seats.Describe(seats))
+    elseif outcome == "full" then
+        ns.Print("follow-up: row marked Group Full.")
+    elseif outcome == "moved" then
+        ns.Print("follow-up: recruiting for something not watched; row removed.")
+    else
         ns.Print("no match (" .. result.reason .. ").")
-        return
     end
-    local roles = (#result.roles > 0) and table.concat(result.roles, ", ") or "no roles named"
-    ns.Print("match: " .. table.concat(result.instances, "/") .. " (" .. roles .. ").")
-    DEFAULT_CHAT_FRAME:AddMessage("[Test] TestSender: " .. Rewrite(text, result.instances))
-    ns.List.Add({
-        sender = "TestSender",
-        display = "TestSender",
-        instances = result.instances,
-        roles = result.roles,
-        text = text,
-        channel = "test",
-        time = GetTime(),
-    })
+    if newMsg then
+        DEFAULT_CHAT_FRAME:AddMessage("[Test] TestSender: " .. newMsg)
+    end
 end
 
 function Chat.Snapshot()

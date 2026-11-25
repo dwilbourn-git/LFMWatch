@@ -20,6 +20,24 @@ function ns.Log(text)
 end
 
 --------------------------------------------------------------------------
+-- Listeners: another addon may ask to be told about each line LFMWatch
+-- judges, with LFMWatchAPI.OnLine(function(info) ... end). info holds
+-- channel, author, text, outcome, reason, instances, seats and test.
+-- LFMWatch itself keeps none of it.
+--------------------------------------------------------------------------
+local listeners = {}
+
+function ns.Notify(info)
+    for _, fn in ipairs(listeners) do pcall(fn, info) end
+end
+
+LFMWatchAPI = {
+    OnLine = function(fn)
+        if type(fn) == "function" then listeners[#listeners + 1] = fn end
+    end,
+}
+
+--------------------------------------------------------------------------
 -- Secret values: never compare, join or pattern-match a chat value before
 -- this says it is readable.
 --------------------------------------------------------------------------
@@ -147,6 +165,7 @@ local function Help()
     ns.Print("  /lfw - open settings")
     ns.Print("  /lfw list - show or hide the list")
     ns.Print("  /lfw test <text> - try a message against your settings")
+    ns.Print("  /lfw clear - empty the list")
     ns.Print("  /lfw rescan - put back any built-in dungeons and raids that are missing")
     ns.Print("  /lfw debug - save a state snapshot (then /reload)")
 end
@@ -178,6 +197,8 @@ SlashCmdList["LFMWATCH"] = function(text)
         else
             Call("Chat", "Test", rest)
         end
+    elseif cmd == "clear" then
+        if Call("List", "Clear") then ns.Print("list emptied.") end
     elseif cmd == "rescan" then
         local ok, dungeons, raids = Call("Journal", "Scan")
         if ok then
