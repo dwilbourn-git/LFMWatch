@@ -510,6 +510,7 @@ function List.Snapshot()
         closedByHand = closedByHand,
         offset = offset,
         classIcons = Style.ClassIconSource(),
+        rowFont = Style.DataFontSource(),
         rows = out,
     }
 end

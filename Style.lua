@@ -89,9 +89,38 @@ function Style.Text(parent, size, _, colour, layer)
 end
 
 -- Condensed text for rows of data; the window font when the file is missing.
+-- A font file the client cannot load is accepted without complaint and then
+-- draws nothing, so the condensed face is tried once on a scratch string and
+-- measured before any row relies on it.
+local dataFontWorks
+local function DataFontWorks()
+    if dataFontWorks == nil then
+        dataFontWorks = false
+        local ok = pcall(function()
+            local probe = UIParent:CreateFontString(nil, "BACKGROUND", "GameFontHighlight")
+            probe:Hide()
+            if ApplyFont(probe, DATA_FONT, 13) then
+                probe:SetText("Ag")
+                local width = probe:GetStringWidth()
+                dataFontWorks = type(width) == "number" and width > 1
+            end
+            probe:SetText("")
+        end)
+        if not ok then dataFontWorks = false end
+    end
+    return dataFontWorks
+end
+
+-- "condensed" or "standard": which face the rows are drawn in. For /lfw debug.
+function Style.DataFontSource()
+    return DataFontWorks() and "condensed" or "standard"
+end
+
 function Style.DataText(parent, size, colour, layer)
     local fs = parent:CreateFontString(nil, layer or "OVERLAY", "GameFontHighlight")
-    if not ApplyFont(fs, DATA_FONT, size or 13) then Style.SetFont(fs, size or 13) end
+    if not (DataFontWorks() and ApplyFont(fs, DATA_FONT, size or 13)) then
+        Style.SetFont(fs, size or 13)
+    end
     Shade(fs)
     colour = colour or C.text
     fs:SetTextColor(colour[1], colour[2], colour[3])
