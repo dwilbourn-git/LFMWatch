@@ -99,23 +99,14 @@ end
 --------------------------------------------------------------------------
 local function Dungeon(requests, total)
     local slots = {}                 -- index 1..5 -> seat
-    local filledRole = {}            -- role -> true: the line says the group has it
     local namedOpen = {}             -- role -> true: the line asks for it
     local placed, anyFilled = 0, false
 
     local function FreeSlot(role)
         for i, slotRole in ipairs(DUNGEON_SLOTS) do
-            if slotRole == role and not slots[i] and not filledRole[role] then return i end
+            if slotRole == role and not slots[i] then return i end
         end
         return nil
-    end
-
-    for _, req in ipairs(requests) do
-        if req.filled and req.role then
-            filledRole[req.role], anyFilled = true, true
-        elseif req.filled then
-            anyFilled = true
-        end
     end
 
     for _, req in ipairs(requests) do
@@ -134,6 +125,19 @@ local function Dungeon(requests, total)
                 placed = placed + 1
             end
             if req.role then namedOpen[req.role] = true end
+        end
+    end
+
+    -- places the line says the group already has ("have tank and 1 dps"):
+    -- that many seats of the role, and no more
+    for _, req in ipairs(requests) do
+        if req.filled then
+            anyFilled = true
+            for _ = 1, req.count do
+                local slot = req.role and FreeSlot(req.role)
+                if not slot then break end
+                slots[slot] = { state = "filled", role = req.role }
+            end
         end
     end
 
@@ -173,7 +177,7 @@ local function Dungeon(requests, total)
         for i, slotRole in ipairs(DUNGEON_SLOTS) do
             if slots[i] then
                 list[i] = slots[i]
-            elseif filledRole[slotRole] or rest == "filled" then
+            elseif rest == "filled" then
                 list[i] = { state = "filled", role = slotRole }
             else
                 list[i] = { state = "unknown" }

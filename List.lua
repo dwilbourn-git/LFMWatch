@@ -417,12 +417,14 @@ function List.Add(entry)
     local e = rows[key]
     local isNew = e == nil
     if isNew then
-        e = { key = key, classColour = ClassColour(entry.guid) }
+        e = { key = key }
         rows[key] = e
         order[#order + 1] = key
     elseif e.full or not SameNames(e.instances, instances) or not ns.Seats.Same(e.seats, entry.seats) then
         e.flashAt = now
     end
+    -- the client may not have known the sender's class the first time
+    if not e.classColour then e.classColour = ClassColour(entry.guid) end
 
     e.sender = entry.sender
     e.display = entry.display or entry.sender

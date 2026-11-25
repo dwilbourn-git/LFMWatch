@@ -124,13 +124,12 @@ local function Note(text)
     y = y + 16
 end
 
-local function Check(x, text, checked, onChange, greyed)
+local function Check(x, text, checked, onChange, greyed, labelWidth)
     local cb = Acquire("check")
     cb:SetPoint("TOPLEFT", content, "TOPLEFT", x + 2, -y - 4)
     cb:Enable()
     cb:SetChecked(checked and true or false)
-    cb.label:SetWidth(CONTENT_WIDTH - 40)
-    cb.label:SetText(text)
+    cb:SetLabel(text, labelWidth or (CONTENT_WIDTH - 40))
     local colour = greyed and C.dim or C.text
     cb.label:SetTextColor(colour[1], colour[2], colour[3])
     cb.onChange = onChange
@@ -222,11 +221,10 @@ local function InstanceSection(title, kind)
     end
     for _, key in ipairs(keys) do
         local inst = ns.db.instances[key]
-        local cb = Check(4, inst.name, ns.cdb.watched[key], function(on)
+        Check(4, inst.name, ns.cdb.watched[key], function(on)
             ns.cdb.watched[key] = on or nil
             Changed()
-        end)
-        cb.label:SetWidth(NAME_WIDTH - 28)
+        end, false, NAME_WIDTH - 28)
         Edit(NAME_WIDTH, ALIAS_WIDTH, table.concat(inst.aliases or {}, ", "), function(text, box)
             -- the row may have just been removed with text still typed in it
             if not ns.db.instances[key] then return end

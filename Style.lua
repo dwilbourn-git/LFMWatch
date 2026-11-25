@@ -37,8 +37,8 @@ local FONT_BOLD = MEDIA .. "RobotoCondensed-Bold.ttf"
 -- Fonts
 --------------------------------------------------------------------------
 function Style.SetFont(fs, size, bold)
-    local ok = pcall(fs.SetFont, fs, bold and FONT_BOLD or FONT, size, "")
-    local current = ok and fs:GetFont() or nil
+    local ok, set = pcall(fs.SetFont, fs, bold and FONT_BOLD or FONT, size, "")
+    local current = ok and set ~= false and fs:GetFont() or nil
     if not current then
         local stock = GameFontHighlightSmall and GameFontHighlightSmall:GetFont()
         if stock then pcall(fs.SetFont, fs, stock, size, "") end
@@ -183,6 +183,14 @@ function Style.Check(parent)
     cb.label:SetPoint("LEFT", cb, "RIGHT", 6, 0)
     cb.label:SetJustifyH("LEFT")
 
+    -- Set the label and make it clickable along with the box.
+    function cb:SetLabel(text, maxWidth)
+        self.label:SetWidth(maxWidth)
+        self.label:SetText(text)
+        local width = math.min(self.label:GetStringWidth() or maxWidth, maxWidth)
+        self:SetHitRectInsets(0, -(width + 8), -4, -4)
+    end
+
     cb:SetScript("OnEnable", function(self)
         self.label:SetTextColor(C.text[1], C.text[2], C.text[3])
         tick:SetDesaturated(false)
@@ -286,10 +294,10 @@ function Style.SeatIcon(parent, size)
         local dim = forceDim or seat.state == "filled"
 
         if seat.state == "unknown" then
-            icon:SetTexture(MEDIA .. "Question.tga")
-            icon:SetSize(size, size)
-            icon:SetVertexColor(C.title[1], C.title[2], C.title[3])
-            icon:Show()
+            -- drawn with the font, so it needs no art file
+            letters:SetText("?")
+            letters:SetTextColor(C.title[1], C.title[2], C.title[3])
+            letters:Show()
         elseif seat.class then
             local ring = C.role[seat.role or "none"] or C.role.none
             disc:SetSize(size, size)
