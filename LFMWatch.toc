@@ -7,6 +7,8 @@
 
 Data.lua
 Core.lua
+Style.lua
+Seats.lua
 Match.lua
 Journal.lua
 List.lua
