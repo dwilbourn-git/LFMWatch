@@ -359,6 +359,10 @@ Build = function()
     WordsSection()
     CloseBox()
     content:SetHeight(y + 10)
+    -- keep the place when the page is rebuilt, without scrolling past the end
+    if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
+    local range = math.max(0, (y + 10) - (scroll:GetHeight() or 0))
+    if (scroll:GetVerticalScroll() or 0) > range then scroll:SetVerticalScroll(range) end
 end
 
 --------------------------------------------------------------------------
@@ -389,13 +393,14 @@ local function EnsureFrame()
     close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
     close:SetFrameLevel(frame:GetFrameLevel() + 40)
 
-    scroll = CreateFrame("ScrollFrame", "LFMWatchOptionsScroll", frame, "UIPanelScrollFrameTemplate")
+    scroll = CreateFrame("ScrollFrame", "LFMWatchOptionsScroll", frame)
     scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, -56)
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 22)
 
     content = CreateFrame("Frame", nil, scroll)
     content:SetSize(CONTENT_WIDTH, 10)
     scroll:SetScrollChild(content)
+    Style.AttachScroll(scroll, frame, 56)
 
     -- text is drawn on its own layer, above the section boxes
     textLayer = CreateFrame("Frame", nil, content)

@@ -275,6 +275,69 @@ function Style.CloseButton(parent, onClick)
     return b
 end
 
+-- Mouse wheel scrolling for a plain ScrollFrame, with Blizzard's thin scroll
+-- bar (MinimalScrollBar, drawn at 70% as FlareUI does) in the gutter to its
+-- right. The bar shows only when there is something to scroll. Where the
+-- client lacks that bar, the wheel still works.
+local SCROLL_SCALE = 0.7
+
+function Style.AttachScroll(scroll, parent, step)
+    local line
+    local ok, made = pcall(CreateFrame, "EventFrame", nil, parent, "MinimalScrollBar")
+    if ok and made and made.SetScrollPercentage and made.SetVisibleExtentPercentage and made.RegisterCallback then
+        line = made
+        line:SetScale(SCROLL_SCALE)
+        line:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 6 / SCROLL_SCALE, 0)
+        line:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 6 / SCROLL_SCALE, 0)
+    elseif ok and made then
+        made:Hide()
+    end
+
+    local setting = false
+    local function Update()
+        if not line then return end
+        local range = scroll:GetVerticalScrollRange() or 0
+        local height = scroll:GetHeight() or 0
+        if not scroll:IsShown() or range <= 0.5 or height <= 0 then
+            line:Hide()
+            return
+        end
+        local visible = height / (height + range)
+        local position = math.max(0, math.min(1, (scroll:GetVerticalScroll() or 0) / range))
+        line:Show()
+        setting = true
+        pcall(function()
+            line:SetVisibleExtentPercentage(visible)
+            if line.SetPanExtentPercentage then
+                line:SetPanExtentPercentage(math.max(0.01, visible * 0.25))
+            end
+            line:SetScrollPercentage(position, true)
+        end)
+        setting = false
+    end
+
+    if line then
+        pcall(line.RegisterCallback, line, "OnScroll", function(_, position)
+            if setting then return end
+            position = math.max(0, math.min(1, position or 0))
+            scroll:SetVerticalScroll(position * (scroll:GetVerticalScrollRange() or 0))
+        end, line)
+    end
+
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(self, delta)
+        local range = self:GetVerticalScrollRange() or 0
+        local target = (self:GetVerticalScroll() or 0) - delta * (step or 40)
+        self:SetVerticalScroll(math.max(0, math.min(range, target)))
+    end)
+    scroll:HookScript("OnVerticalScroll", Update)
+    scroll:HookScript("OnScrollRangeChanged", Update)
+    scroll:HookScript("OnSizeChanged", Update)
+    scroll:HookScript("OnShow", Update)
+    Update()
+    return Update
+end
+
 function Style.EditBackdrop(edit)
     -- InputBoxTemplate draws its own three-piece border; hide it when present
     for _, key in ipairs({ "Left", "Middle", "Right" }) do
