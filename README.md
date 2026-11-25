@@ -9,7 +9,7 @@ When someone in guild chat or a watched channel posts a line such as
 
 - tags and tints the line in chat, for example `[LFM Deadmines]`;
 - adds the sender to a small pop-out list of who is recruiting, with the
-  dungeon and the roles they asked for.
+  dungeon and a row of icons showing which places are open.
 
 There is no sound. A sender drops off the list five minutes after their most
 recent message (the time is adjustable from 1 to 15 minutes).
@@ -40,6 +40,31 @@ ignored unless you tick **Include LFG**.
 
 ## The list
 
+One row per recruiter. If the same person posts again, in any watched
+channel, their row is updated in place and flashes; it is never duplicated.
+A follow-up such as "still need a healer" updates the row without naming the
+dungeon again. If they say the group is full, the row dims, is labelled
+"Group Full" and leaves after a minute. The thin bar under a row is the time
+it has left.
+
+### Seat icons
+
+A dungeon row shows five places: tank, healer and three damage.
+
+| Icon | Meaning |
+|---|---|
+| Bright role icon | That place is open: the line asked for it |
+| Dim role icon | Filled, worked out from what the line asked for |
+| Gold question mark | Nothing to go on |
+| Class icon in a coloured ring | A particular class is wanted; the ring is blue for tank, green for healer, red for damage, bronze when the role was not stated |
+
+"LFM DM need tank and healer" lights the tank and healer and dims the three
+damage places. "LF2M dps" lights two damage places. A line that names no
+role, class or number shows five question marks.
+
+A raid row shows only what is being asked for, for example two healer icons
+and a warlock.
+
 | Action | Result |
 |---|---|
 | Hover a row | Shows the full message and the channel |
@@ -53,7 +78,8 @@ ignored unless you tick **Include LFG**.
 |---|---|
 | `/lfw` | Open or close the settings |
 | `/lfw list` | Show or hide the list |
-| `/lfw test <text>` | Run a line through the matcher as if someone had said it |
+| `/lfw test <text>` | Run a line through the matcher as if someone had said it, and print the places it read |
+| `/lfw clear` | Empty the list |
 | `/lfw rescan` | Restore any built-in dungeons missing from your list |
 | `/lfw debug` | Save a snapshot of recent decisions for troubleshooting |
 
@@ -72,9 +98,16 @@ ignored unless you tick **Include LFG**.
 - Channel and dungeon ticks are saved per character; word lists and the
   dungeon list are shared across characters.
 
+## Credits
+
+The look follows FlareUI by
+Malkkav. The border and icon art are copied from FlareUI (MIT) and the font is
+Roboto Condensed (Apache 2.0); see the `LICENSES` folder. LFMWatch does not
+need FlareUI installed.
+
 ## Status
 
-Version 0.1.1. Early release: the settings, the matcher and the list have
+Version 0.2.0. Early release: the settings, the matcher and the list have
 been tried in game, but it has had little use with real recruiting traffic.
 Bug reports are welcome on the issue tracker.
 
