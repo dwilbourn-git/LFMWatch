@@ -138,6 +138,6 @@ Data.INSTANCES = {
 -- from the name above.
 Data.LEGACY_NAMES = {
     ["Sunken Temple"] = { "Temple of Atal'Hakkar" },
-    ["Stratholme: Living"] = { "Stratholme: Live" },
-    ["Stratholme: Undead"] = { "Stratholme: Dead" },
+    ["Stratholme: Living"] = { "Stratholme: Live", "Stratholme Main Gate" },
+    ["Stratholme: Undead"] = { "Stratholme: Dead", "Stratholme Service Gate" },
 }

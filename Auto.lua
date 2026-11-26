@@ -72,7 +72,9 @@ function Auto.Recompute(level)
             for key, inst in pairs(db.instances) do
                 local ok = type(inst) == "table"
                 if ok and levelOn then
-                    ok = level ~= nil and type(inst.min) == "number" and type(inst.max) == "number"
+                    -- dungeons only: every raid is level 60 and would all be picked there
+                    ok = inst.kind ~= "raid" and level ~= nil
+                        and type(inst.min) == "number" and type(inst.max) == "number"
                         and inst.min <= level and level <= inst.max
                 end
                 if ok and legacyOn then
@@ -145,7 +147,7 @@ local function ReadSet(id, title, index, phrases)
     local items, naming = {}, 0
     for j = 1, count do
         local okC, text, _, done = pcall(GetAchievementCriteriaInfo, id, j)
-        if okC and ns.Readable(text) and type(text) == "string" and ns.Readable(done) then
+        if okC and ns.Readable(text) and type(text) == "string" and (done == nil or ns.Readable(done)) then
             local keys = KeysNamed(text, index, phrases)
             if #keys > 0 then naming = naming + 1 end
             for _, key in ipairs(keys) do
@@ -169,6 +171,7 @@ end
 function Auto.ReadLegacy(full)
     if not (ns.db and ns.cdb) then return false end
     if not HaveAchievementAPI() then return false end
+    if not full and next(ns.db.legacy.sets) == nil then return false end
     if InCombat() then
         pendingRead = true
         return false
@@ -179,14 +182,14 @@ function Auto.ReadLegacy(full)
     local index, phrases = NameIndex()
     local sets = {}
 
-    if not full and next(ns.db.legacy.sets) ~= nil then
-        for id in pairs(ns.db.legacy.sets) do
+    if not full then
+        for id, old in pairs(ns.db.legacy.sets) do
             local number = tonumber(id)
-            if number then
-                local okA, _, title = pcall(GetAchievementInfo, number)
-                local set = okA and ReadSet(number, title, index, phrases)
-                if set then sets[id] = set end
-            end
+            local okA, _, title
+            if number then okA, _, title = pcall(GetAchievementInfo, number) end
+            local set = okA and ReadSet(number, title, index, phrases)
+            -- a set that cannot be read this time keeps its last reading
+            sets[id] = set or old
         end
     else
         local okL, categories = pcall(GetCategoryList)
@@ -246,12 +249,21 @@ function Auto.HasRead()
     return readOnce
 end
 
+-- False when this client has no achievement functions to read Legacy with.
+function Auto.CanRead()
+    return HaveAchievementAPI()
+end
+
 function Auto.PrintLegacy()
     if not HaveAchievementAPI() then
         ns.Print("this client has no achievement functions; Legacy cannot be read.")
         return
     end
-    if not InCombat() then Auto.ReadLegacy(true) end
+    if InCombat() then
+        ns.Print("in combat: showing the last reading.")
+    else
+        Auto.ReadLegacy(true)
+    end
     local sets = Auto.Sets()
     if #sets == 0 then
         ns.Print("no Legacy challenge that lists dungeons was found.")

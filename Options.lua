@@ -9,8 +9,8 @@ local WIDTH, HEIGHT = 600, 640
 local CONTENT_WIDTH = 520
 local ROW = 28
 local INDENT = 14          -- from the edge of a section box to its contents
-local NAME_WIDTH = 250
-local ALIAS_WIDTH = 186
+local NAME_WIDTH = 290     -- name, level range and "auto"
+local ALIAS_WIDTH = 146
 
 local Style = ns.Style
 local C = Style.COLORS
@@ -288,6 +288,10 @@ local function AutoSection()
 
     local sets = ns.Auto.Sets()
     if #sets == 0 then
+        if not ns.Auto.CanRead() then
+            Note("Legacy challenges could not be read on this client.")
+            return
+        end
         Note(ns.Auto.HasRead() and "No Legacy challenge that lists dungeons was found."
             or "Your Legacy challenges have not been read yet.")
         Button(4, 110, "Read again", function()
@@ -388,7 +392,7 @@ end
 
 local function ListSection()
     Header("List")
-    Label(0, "Time left on each row:")
+    Label(0, "Time left:")
     local function Pick(mode)
         return function()
             ns.db.timeDisplay = mode
@@ -396,9 +400,9 @@ local function ListSection()
         end
     end
     local mode = ns.db.timeDisplay
-    Choice(170, "Bar", mode == "bar", Pick("bar"), 50)
-    Choice(250, "Time", mode == "time", Pick("time"), 50)
-    Choice(336, "Both", mode == "both", Pick("both"), 50)
+    Choice(84, "Bar", mode == "bar", Pick("bar"), 50)
+    Choice(164, "Time", mode == "time", Pick("time"), 50)
+    Choice(250, "Both", mode == "both", Pick("both"), 50)
     y = y + ROW + 4
 end
 
