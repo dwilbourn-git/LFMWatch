@@ -24,7 +24,7 @@ local SEAT_SIZE = 16
 local SEAT_STEP = 18
 local MAX_SEATS = 6
 local SEAT_COLUMN = MAX_SEATS * SEAT_STEP + 10   -- room for the "+"
-local ROW_WIDTH = WIDTH - 2 * PAD
+local TIME_COLUMN = 40      -- room for "4:12" when the time is shown
 local FULL_SECONDS = 60       -- how long a "Group Full" row stays
 local FLASH_SECONDS = 0.6
 local FLASH_ALPHA = 0.35
@@ -35,6 +35,12 @@ local offset = 0           -- rows scrolled past
 local frame, rowFrames, emptyText, moreText, titleCount
 local ticker
 local closedByHand = false
+-- from ns.db.timeDisplay: "bar", "time" or "both"
+local timeShown, barShown, shownMode = false, true, nil
+
+local function RowWidth()
+    return WIDTH + (timeShown and TIME_COLUMN or 0) - 2 * PAD
+end
 
 --------------------------------------------------------------------------
 -- Helpers
@@ -122,6 +128,21 @@ local function FlashUpdate(self)
     end
 end
 
+-- Place the parts of a row that move when the time column comes or goes.
+local function LayoutRow(row)
+    local right = timeShown and TIME_COLUMN or 0
+    row.instance:ClearAllPoints()
+    row.instance:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
+    row.instance:SetPoint("RIGHT", row, "RIGHT", -(SEAT_COLUMN + right + 6), 1)
+    for i, icon in ipairs(row.seats) do
+        icon:ClearAllPoints()
+        icon:SetPoint("LEFT", row, "RIGHT", -(SEAT_COLUMN + right) + (i - 1) * SEAT_STEP, 1)
+    end
+    row.more:ClearAllPoints()
+    row.more:SetPoint("LEFT", row, "RIGHT", -(SEAT_COLUMN + right) + MAX_SEATS * SEAT_STEP, 1)
+    row.time:SetShown(timeShown)
+end
+
 local function CreateRow(index)
     local row = CreateFrame("Button", nil, frame)
     row:SetHeight(ROW_HEIGHT)
@@ -166,6 +187,12 @@ local function CreateRow(index)
     row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 1)
     row.bar:SetHeight(2)
     row.bar:SetColorTexture(C.border[1], C.border[2], C.border[3], 0.9)
+
+    -- time left, as minutes and seconds
+    row.time = Style.DataText(row, 13, C.dim)
+    row.time:SetPoint("RIGHT", row, "RIGHT", -2, 1)
+    row.time:SetJustifyH("RIGHT")
+    LayoutRow(row)
 
     row:SetScript("OnEnter", function(self)
         local e = self.entry
@@ -264,8 +291,12 @@ local function DrawBar(row, now)
     local life = Lifetime(e)
     local left = 1 - (now - StartedAt(e)) / life
     if left < 0 then left = 0 elseif left > 1 then left = 1 end
-    row.bar:SetWidth(math.max(0.001, ROW_WIDTH * left))
-    row.bar:SetShown(left > 0)
+    row.bar:SetWidth(math.max(0.001, RowWidth() * left))
+    row.bar:SetShown(barShown and left > 0)
+    if timeShown then
+        local seconds = math.max(0, math.floor(life * left + 0.5))
+        row.time:SetText(string.format("%d:%02d", math.floor(seconds / 60), seconds % 60))
+    end
 end
 
 local function DrawRow(row, e, now)
@@ -299,8 +330,20 @@ local function DrawRow(row, e, now)
     row:Show()
 end
 
+-- Follow the "time left" setting: which of bar and time show, and the width.
+local function ApplyMode()
+    local mode = (ns.db and ns.db.timeDisplay) or "bar"
+    if mode == shownMode then return end
+    shownMode = mode
+    timeShown = mode ~= "bar"
+    barShown = mode ~= "time"
+    frame:SetWidth(WIDTH + (timeShown and TIME_COLUMN or 0))
+    for i = 1, MAX_ROWS do LayoutRow(rowFrames[i]) end
+end
+
 Refresh = function()
     if not frame then return end
+    ApplyMode()
     if offset > MaxOffset() then offset = MaxOffset() end
 
     local total = #order
@@ -482,6 +525,11 @@ function List.Toggle()
         Refresh()
         frame:Show()
     end
+end
+
+-- Draw again after a display setting changed.
+function List.Redraw()
+    if frame then Refresh() end
 end
 
 function List.Count()

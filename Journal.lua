@@ -44,13 +44,18 @@ function Journal.Scan()
     local instances = ns.db.instances
     local builtin = {}
     for _, def in ipairs(ns.Data.INSTANCES) do
-        local name, kind, aliases = def[1], def[2], def[3]
+        local name, kind, aliases, range = def[1], def[2], def[3], def[4]
         local key = Key(name)
         builtin[key] = true
         if instances[key] == nil then
             local copy = {}
             for i, a in ipairs(aliases) do copy[i] = a end
             instances[key] = { name = name, kind = kind, aliases = copy, custom = false }
+        end
+        -- level ranges are not editable, so they always follow the built-in list
+        if type(instances[key]) == "table" and not instances[key].custom then
+            instances[key].min = range and range[1] or nil
+            instances[key].max = range and range[2] or nil
         end
     end
 
@@ -98,19 +103,41 @@ function Journal.SetAliases(key, text)
     inst.aliases = Journal.ParseList(text)
 end
 
--- Keys of one kind ("dungeon" or "raid"), sorted by name.
+-- "17-26", "60", or "" for an instance with no known range.
+function Journal.RangeText(inst)
+    if type(inst) ~= "table" or type(inst.min) ~= "number" or type(inst.max) ~= "number" then return "" end
+    if inst.min == inst.max then return tostring(inst.min) end
+    return inst.min .. "-" .. inst.max
+end
+
+-- Keys of one kind ("dungeon" or "raid"), sorted A to Z, or by level range
+-- when ns.db.sort is "level" (lowest first; instances with no range last).
 function Journal.Sorted(kind)
+    local instances = ns.db.instances
     local keys = {}
-    for key, inst in pairs(ns.db.instances) do
+    for key, inst in pairs(instances) do
         if (inst.kind == "raid") == (kind == "raid") then keys[#keys + 1] = key end
     end
+    local byLevel = ns.db.sort == "level"
     table.sort(keys, function(a, b)
-        return ns.db.instances[a].name < ns.db.instances[b].name
+        local ia, ib = instances[a], instances[b]
+        if byLevel then
+            local minA, minB = tonumber(ia.min) or 999, tonumber(ib.min) or 999
+            if minA ~= minB then return minA < minB end
+            local maxA, maxB = tonumber(ia.max) or 999, tonumber(ib.max) or 999
+            if maxA ~= maxB then return maxA < maxB end
+        end
+        if ia.name ~= ib.name then return ia.name < ib.name end
+        return a < b
     end)
     return keys
 end
 
 ns.OnLogin(function()
     Journal.Scan()
-    if ns.Match then ns.Match.Rebuild() end
+    if ns.Auto then
+        ns.Auto.Recompute()
+    elseif ns.Match then
+        ns.Match.Rebuild()
+    end
 end)

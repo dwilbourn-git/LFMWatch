@@ -85,11 +85,19 @@ local function InitDB()
     if type(db.ignore) ~= "table" then db.ignore = CopyList(ns.Data.IGNORE) end
     if type(db.includeLFG) ~= "boolean" then db.includeLFG = false end
     db.expiryMinutes = ns.ClampExpiry(db.expiryMinutes)
+    if db.timeDisplay ~= "time" and db.timeDisplay ~= "both" then db.timeDisplay = "bar" end
+    if db.sort ~= "level" then db.sort = "name" end
+    -- the last reading of the Legacy challenges; they are account-wide
+    if type(db.legacy) ~= "table" then db.legacy = {} end
+    if type(db.legacy.sets) ~= "table" then db.legacy.sets = {} end
 
     if type(cdb.guild) ~= "boolean" then cdb.guild = false end
     if type(cdb.channels) ~= "table" then cdb.channels = {} end
     if type(cdb.watched) ~= "table" then cdb.watched = {} end
     if type(cdb.autoShow) ~= "boolean" then cdb.autoShow = true end
+    if type(cdb.autoLevel) ~= "boolean" then cdb.autoLevel = false end
+    if type(cdb.autoLegacy) ~= "table" then cdb.autoLegacy = {} end
+    if type(cdb.legacyIncludeDone) ~= "boolean" then cdb.legacyIncludeDone = false end
 
     ns.db, ns.cdb = db, cdb
 end
@@ -152,6 +160,9 @@ local function Snapshot()
         ignore = CopyList(ns.db.ignore),
         instanceCount = count,
         rows = ns.List and ns.List.Snapshot and ns.List.Snapshot() or nil,
+        auto = ns.Auto and ns.Auto.Snapshot and ns.Auto.Snapshot() or nil,
+        timeDisplay = ns.db.timeDisplay,
+        sort = ns.db.sort,
         chat = ns.Chat and ns.Chat.Snapshot and ns.Chat.Snapshot() or nil,
         log = CopyList(log),
     }
@@ -166,6 +177,7 @@ local function Help()
     ns.Print("  /lfw list - show or hide the list")
     ns.Print("  /lfw test <text> - try a message against your settings")
     ns.Print("  /lfw clear - empty the list")
+    ns.Print("  /lfw legacy - show what was read from your Legacy challenges")
     ns.Print("  /lfw rescan - put back any built-in dungeons and raids that are missing")
     ns.Print("  /lfw debug - save a state snapshot (then /reload)")
 end
@@ -203,8 +215,14 @@ SlashCmdList["LFMWATCH"] = function(text)
         local ok, dungeons, raids = Call("Journal", "Scan")
         if ok then
             ns.Print("list restored: " .. tostring(dungeons) .. " dungeons, " .. tostring(raids) .. " raids.")
-            if ns.Match then ns.Match.Rebuild() end
+            if ns.Auto then
+                ns.Auto.Recompute()
+            elseif ns.Match then
+                ns.Match.Rebuild()
+            end
         end
+    elseif cmd == "legacy" then
+        Call("Auto", "PrintLegacy")
     elseif cmd == "debug" then
         Snapshot()
         ns.Print("snapshot saved. /reload to write it to disk.")

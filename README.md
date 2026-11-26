@@ -38,14 +38,34 @@ the settings, and you can add dungeons of your own with their aliases.
 "Looking for group" lines (people seeking a group, not forming one) are
 ignored unless you tick **Include LFG**.
 
+## Watching automatically
+
+So you do not have to re-tick dungeons as you level, LFMWatch can pick them
+for you. Picks are added to your own ticks and never change them; a picked
+dungeon shows "auto" beside its name.
+
+- **Dungeons in my level range** watches every dungeon whose level range
+  includes your level, and follows you as you level up.
+- **Legacy challenges** lists the game's dungeon challenge sets with your
+  progress. Tick the sets you are working on to watch their dungeons. By
+  default only dungeons you have not yet completed are picked; tick
+  **Include dungeons already completed** to watch the whole set.
+- With the level option and a Legacy set both on, a dungeon must satisfy
+  both: in your range, and in a ticked set.
+
+A dungeon that is in no Legacy set (The Stockade) or that you added by hand
+(no level range) is only watched when you tick it yourself.
+
+The dungeon list can be sorted A to Z or by level range.
+
 ## The list
 
 One row per recruiter. If the same person posts again, in any watched
 channel, their row is updated in place and flashes; it is never duplicated.
 A follow-up such as "still need a healer" updates the row without naming the
 dungeon again. If they say the group is full, the row dims, is labelled
-"Group Full" and leaves after a minute. The thin bar under a row is the time
-it has left.
+"Group Full" and leaves after a minute. The time a row has left is shown as
+a thin bar under it, as minutes and seconds, or both; choose in the settings.
 
 ### Seat icons
 
@@ -80,6 +100,7 @@ and a warlock.
 | `/lfw list` | Show or hide the list |
 | `/lfw test <text>` | Run a line through the matcher as if someone had said it, and print the places it read |
 | `/lfw clear` | Empty the list |
+| `/lfw legacy` | Show what was read from your Legacy challenges |
 | `/lfw rescan` | Restore any built-in dungeons missing from your list |
 | `/lfw debug` | Save a snapshot of recent decisions for troubleshooting |
 
@@ -105,9 +126,11 @@ Malkkav. The border and icon art are copied from FlareUI (MIT) and the font is
 Roboto Condensed (Apache 2.0); see the `LICENSES` folder. LFMWatch does not
 need FlareUI installed.
 
+Dungeon level ranges are those shown by the ForeverDungeonJournal addon.
+
 ## Status
 
-Version 0.2.0. Early release: the settings, the matcher and the list have
+Version 0.3.0. Early release: the settings, the matcher and the list have
 been tried in game, but it has had little use with real recruiting traffic.
 Bug reports are welcome on the issue tracker.
 

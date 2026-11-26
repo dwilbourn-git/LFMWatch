@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: LFMWatch
 ## Notes: Marks chat lines recruiting for the dungeons and raids you watch, and lists who is recruiting. Type /lfw.
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: LFMWatchDB
 ## SavedVariablesPerCharacter: LFMWatchCharDB
 
@@ -11,6 +11,7 @@ Style.lua
 Seats.lua
 Match.lua
 Journal.lua
+Auto.lua
 List.lua
 Chat.lua
 Options.lua

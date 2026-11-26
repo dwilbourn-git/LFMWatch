@@ -9,8 +9,8 @@ local WIDTH, HEIGHT = 600, 640
 local CONTENT_WIDTH = 520
 local ROW = 28
 local INDENT = 14          -- from the edge of a section box to its contents
-local NAME_WIDTH = 210
-local ALIAS_WIDTH = 220
+local NAME_WIDTH = 250
+local ALIAS_WIDTH = 186
 
 local Style = ns.Style
 local C = Style.COLORS
@@ -189,8 +189,35 @@ local function Button(x, width, text, onClick)
     return b
 end
 
+-- What is watched changed: work out the automatic picks again, which also
+-- rebuilds the matcher.
 local function Changed()
-    if ns.Match then ns.Match.Rebuild() end
+    if ns.Auto then
+        ns.Auto.Recompute()
+    elseif ns.Match then
+        ns.Match.Rebuild()
+    end
+end
+
+-- A line of plain text at the start of a row of controls.
+local function Label(x, text)
+    local fs = Acquire("label")
+    Style.SetFont(fs, 13)
+    fs:SetTextColor(C.text[1], C.text[2], C.text[3])
+    fs:SetPoint("TOPLEFT", content, "TOPLEFT", x + INDENT + 2, -y - 6)
+    fs:SetWidth(CONTENT_WIDTH - 2 * INDENT - x)
+    fs:SetJustifyH("LEFT")
+    fs:SetText(text)
+    return fs
+end
+
+-- One of several exclusive choices, drawn as a tick box. Picking it runs
+-- onPick and redraws the page, so exactly one of the group shows ticked.
+local function Choice(x, text, selected, onPick, width)
+    return Check(x, text, selected, function()
+        onPick()
+        Build()
+    end, false, width)
 end
 
 --------------------------------------------------------------------------
@@ -245,8 +272,59 @@ local function ChannelSection()
     end
 end
 
+-- Dungeons picked for the player, on top of the ones ticked by hand.
+local function AutoSection()
+    Header("Watch automatically")
+    Note("Added to the dungeons you tick yourself. Your own ticks are never changed.")
+
+    local level = ns.Auto.Level()
+    Check(4, "Dungeons in my level range" .. (level and (" (level " .. level .. ")") or ""),
+        ns.cdb.autoLevel, function(on)
+            ns.cdb.autoLevel = on
+            Changed()
+            Build()
+        end)
+    y = y + ROW + 6
+
+    local sets = ns.Auto.Sets()
+    if #sets == 0 then
+        Note(ns.Auto.HasRead() and "No Legacy challenge that lists dungeons was found."
+            or "Your Legacy challenges have not been read yet.")
+        Button(4, 110, "Read again", function()
+            ns.Auto.ReadLegacy(true)
+            Build()
+        end)
+        y = y + ROW + 4
+        return
+    end
+
+    Note("Dungeons of these Legacy challenges:")
+    for _, set in ipairs(sets) do
+        local id = set.id
+        Check(4, set.title .. "   |cff808080" .. set.done .. " of " .. set.total .. " done|r",
+            ns.cdb.autoLegacy[id], function(on)
+                ns.cdb.autoLegacy[id] = on or nil
+                Changed()
+                Build()
+            end)
+        y = y + ROW
+    end
+    Check(4, "Include dungeons already completed", ns.cdb.legacyIncludeDone, function(on)
+        ns.cdb.legacyIncludeDone = on
+        Changed()
+        Build()
+    end)
+    y = y + ROW + 2
+    Note("With the level option on as well, a dungeon must also be in your range.")
+end
+
 local function InstanceSection(title, kind)
     Header(title)
+    Label(0, "Sort:")
+    Choice(46, "A to Z", ns.db.sort ~= "level", function() ns.db.sort = "name" end, 70)
+    Choice(146, "By level", ns.db.sort == "level", function() ns.db.sort = "level" end, 80)
+    y = y + ROW + 4
+
     local keys = ns.Journal.Sorted(kind)
     if #keys == 0 then
         Note("None yet. Add one below.")
@@ -254,7 +332,11 @@ local function InstanceSection(title, kind)
     end
     for _, key in ipairs(keys) do
         local inst = ns.db.instances[key]
-        Check(4, inst.name, ns.cdb.watched[key], function(on)
+        local label = inst.name
+        local range = ns.Journal.RangeText(inst)
+        if range ~= "" then label = label .. "  |cff808080" .. range .. "|r" end
+        if ns.Auto.IsPicked(key) then label = label .. "  |cffa67d45auto|r" end
+        Check(4, label, ns.cdb.watched[key], function(on)
             ns.cdb.watched[key] = on or nil
             Changed()
         end, false, NAME_WIDTH - 28)
@@ -302,6 +384,22 @@ local function AddSection()
     Button(4, 110, "Add dungeon", function() Add("dungeon") end)
     Button(134, 110, "Add raid", function() Add("raid") end)
     y = y + ROW + 2
+end
+
+local function ListSection()
+    Header("List")
+    Label(0, "Time left on each row:")
+    local function Pick(mode)
+        return function()
+            ns.db.timeDisplay = mode
+            if ns.List and ns.List.Redraw then ns.List.Redraw() end
+        end
+    end
+    local mode = ns.db.timeDisplay
+    Choice(170, "Bar", mode == "bar", Pick("bar"), 50)
+    Choice(250, "Time", mode == "time", Pick("time"), 50)
+    Choice(336, "Both", mode == "both", Pick("both"), 50)
+    y = y + ROW + 4
 end
 
 local function WordsSection()
@@ -353,9 +451,11 @@ Build = function()
     ReleaseAll()
     y, openBox = 0, nil
     ChannelSection()
+    AutoSection()
     InstanceSection("Dungeons", "dungeon")
     InstanceSection("Raids", "raid")
     AddSection()
+    ListSection()
     WordsSection()
     CloseBox()
     content:SetHeight(y + 10)
@@ -429,7 +529,8 @@ end
 --------------------------------------------------------------------------
 ns.OnLogin(function()
     local anyChannel = ns.cdb.guild or next(ns.cdb.channels) ~= nil
-    local anyInstance = next(ns.cdb.watched) ~= nil
+    local anyInstance = next(ns.cdb.watched) ~= nil or ns.cdb.autoLevel
+        or next(ns.cdb.autoLegacy) ~= nil
     if not (anyChannel and anyInstance) then
         ns.Print("nothing is being watched yet. Type /lfw to choose channels and dungeons.")
     end

@@ -72,10 +72,15 @@ function Match.Rebuild()
     local db, cdb = ns.db, ns.cdb
     if not (db and cdb) then return end
 
+    -- watched: ticked by hand, or picked by the automatic options (Auto.lua)
+    local function IsWatched(key)
+        if ns.Auto then return ns.Auto.IsWatched(key) end
+        return cdb.watched[key] and true or false
+    end
+
     local watchedNeedles = {}
-    for key, on in pairs(cdb.watched) do
-        local inst = on and db.instances[key]
-        if type(inst) == "table" and type(inst.name) == "string" then
+    for key, inst in pairs(db.instances) do
+        if IsWatched(key) and type(inst) == "table" and type(inst.name) == "string" then
             local needles, seen = {}, {}
             AddNeedle(needles, seen, inst.name)
             -- "The Deadmines" is also written "Deadmines"
@@ -104,7 +109,7 @@ function Match.Rebuild()
     -- is left out.
     local otherSeen = {}
     for key, inst in pairs(db.instances) do
-        if not cdb.watched[key] and type(inst) == "table" and type(inst.name) == "string" then
+        if not IsWatched(key) and type(inst) == "table" and type(inst.name) == "string" then
             local candidates = { inst.name }
             local short = inst.name:lower():match("^the%s+(.+)$")
             if short then candidates[#candidates + 1] = short end
